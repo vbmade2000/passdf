@@ -1,9 +1,8 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
-
 use clap::Parser;
+use tokio::{
+    fs::File,
+    io::{AsyncBufReadExt, BufReader},
+};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -35,21 +34,26 @@ struct Args {
     show_password: bool,
 }
 
-fn read_password_file(filename: &str) -> Vec<String> {
-    let file = File::open(filename).unwrap();
+async fn read_password_file(filename: &str) -> Vec<String> {
+    let file = File::open(filename).await.unwrap();
     let reader = BufReader::new(file);
 
-    reader
-        .lines()
-        .map_while(|line| line.ok())
-        .filter(|line| !line.is_empty())
-        .collect()
+    let mut passwords: Vec<String> = Vec::new();
+
+    let mut lines = reader.lines();
+
+    while let Some(line) = lines.next_line().await.unwrap() {
+        passwords.push(line);
+    }
+
+    passwords
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
 
-    let passwords = read_password_file(&args.passord_file);
+    let passwords = read_password_file(&args.passord_file).await;
 
     println!("Passwords: {:?}", passwords);
 }
