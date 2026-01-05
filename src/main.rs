@@ -1,3 +1,8 @@
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
+
 use clap::Parser;
 
 #[derive(Debug, Parser)]
@@ -30,7 +35,21 @@ struct Args {
     show_password: bool,
 }
 
+fn read_password_file(filename: &str) -> Vec<String> {
+    let file = File::open(filename).unwrap();
+    let reader = BufReader::new(file);
+
+    reader
+        .lines()
+        .map_while(|line| line.ok())
+        .filter(|line| !line.is_empty())
+        .collect()
+}
+
 fn main() {
     let args = Args::parse();
-    println!("Hello, world!");
+
+    let passwords = read_password_file(&args.passord_file);
+
+    println!("Passwords: {:?}", passwords);
 }
