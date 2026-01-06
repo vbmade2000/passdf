@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use async_channel::{Receiver, Sender};
 use clap::Parser;
@@ -8,7 +8,7 @@ use tokio::{
 };
 
 enum Message {
-    PdfPath(String),
+    PdfPath(PathBuf),
     Shutdown,
 }
 
@@ -27,7 +27,7 @@ struct Args {
         required_unless_present = "directory",
         conflicts_with = "directory"
     )]
-    pdf_file: Option<String>,
+    pdf_file: Option<PathBuf>,
 
     /// Directory containing PDF files to process
     #[arg(short, long, value_name = "DIR", conflicts_with = "pdf_file")]
@@ -71,7 +71,7 @@ async fn worker(
 
     while let Ok(msg) = input_receiver.recv().await {
         match msg {
-            Message::PdfPath(pdf_path) => println!("Received pdf path: {}", pdf_path),
+            Message::PdfPath(pdf_path) => println!("Received pdf path: {:?}", pdf_path),
             Message::Shutdown => break,
         }
     }
@@ -113,13 +113,23 @@ async fn main() {
         handles.push(handle);
     }
 
+    if let Some(pdf_file) = args.pdf_file {
+        let pdf_file_path = PathBuf::from(pdf_file).canonicalize().unwrap();
+        if pdf_file_path.try_exists().unwrap() {
+            task_sender.send(Message::PdfPath(pdf_file_path)).await.unwrap();
+        }
+    } else if let Some(directory) = args.directory {
+        let dir_path = PathBuf::from(directory).canonicalize().unwrap();
+        println!("Scanning directory: {:?}", dir_path);
+    }
+
     println!("All workers started");
 
     // TODO: Send PDF paths to workers via task_sender
     // For now, just send shutdown messages
-    for _ in 0..num_workers {
-        task_sender.send(Message::Shutdown).await.unwrap();
-    }
+    // for _ in 0..num_workers {
+    //     task_sender.send(Message::Shutdown).await.unwrap();
+    // }
 
     // Wait for all workers to complete
     for handle in handles {
